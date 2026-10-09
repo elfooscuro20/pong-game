@@ -21,7 +21,7 @@ const rightPaddle = {
   y: canvas.height / 2 - paddleHeight / 2,
   width: paddleWidth,
   height: paddleHeight,
-  speed: 5
+  speed: 5.2
 };
 
 const ball = {
@@ -32,6 +32,9 @@ const ball = {
   vx: 5,
   vy: 3
 };
+
+const trail = [];
+let screenFlash = 0;
 
 let playerScore = 0;
 let computerScore = 0;
@@ -44,6 +47,11 @@ let keys = {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function addTrail() {
+  trail.push({ x: ball.x, y: ball.y, life: 1 });
+  if (trail.length > 18) trail.shift();
 }
 
 function resetBall(direction) {
@@ -84,13 +92,16 @@ function updatePaddles() {
 function updateBall() {
   ball.x += ball.vx;
   ball.y += ball.vy;
+  addTrail();
 
   if (ball.y - ball.radius <= 0) {
     ball.y = ball.radius;
     ball.vy *= -1;
+    screenFlash = 0.14;
   } else if (ball.y + ball.radius >= canvas.height) {
     ball.y = canvas.height - ball.radius;
     ball.vy *= -1;
+    screenFlash = 0.14;
   }
 
   if (
@@ -104,6 +115,7 @@ function updateBall() {
     const offset = (ball.y - (leftPaddle.y + leftPaddle.height / 2)) / (leftPaddle.height / 2);
     ball.vx = Math.abs(ball.vx) + 0.4;
     ball.vy = offset * 8;
+    screenFlash = 0.18;
   }
 
   if (
@@ -117,17 +129,22 @@ function updateBall() {
     const offset = (ball.y - (rightPaddle.y + rightPaddle.height / 2)) / (rightPaddle.height / 2);
     ball.vx = -Math.abs(ball.vx) - 0.4;
     ball.vy = offset * 8;
+    screenFlash = 0.18;
   }
 
   if (ball.x - ball.radius < 0) {
     computerScore++;
     updateScores();
     resetBall(1);
+    screenFlash = 0.25;
   } else if (ball.x + ball.radius > canvas.width) {
     playerScore++;
     updateScores();
     resetBall(-1);
+    screenFlash = 0.25;
   }
+
+  if (screenFlash > 0) screenFlash -= 0.02;
 }
 
 function drawRect(x, y, w, h, color) {
@@ -142,22 +159,50 @@ function drawBall(x, y, radius, color) {
   ctx.fill();
 }
 
+function drawTrail() {
+  for (let i = 0; i < trail.length; i++) {
+    const p = trail[i];
+    const alpha = p.life * 0.55;
+    ctx.fillStyle = `rgba(126, 231, 135, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, ball.radius * (0.4 + i / trail.length), 0, Math.PI * 2);
+    ctx.fill();
+    p.life -= 0.08;
+  }
+
+  for (let i = trail.length - 1; i >= 0; i--) {
+    if (trail[i].life <= 0) trail.splice(i, 1);
+  }
+}
+
 function drawBoard() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.strokeStyle = "#d0d7de";
+  ctx.shadowColor = "rgba(94, 234, 212, 0.8)";
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = "rgba(218, 240, 255, 0.8)";
   ctx.setLineDash([15, 15]);
   ctx.beginPath();
   ctx.moveTo(canvas.width / 2, 0);
   ctx.lineTo(canvas.width / 2, canvas.height);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
 
+  drawTrail();
+
+  ctx.shadowColor = "rgba(126, 231, 135, 0.9)";
+  ctx.shadowBlur = 18;
   drawRect(leftPaddle.x, leftPaddle.y, leftPaddle.width, leftPaddle.height, "#f0f6fc");
   drawRect(rightPaddle.x, rightPaddle.y, rightPaddle.width, rightPaddle.height, "#f0f6fc");
-
   drawBall(ball.x, ball.y, ball.radius, "#7ee787");
+  ctx.shadowBlur = 0;
+
+  if (screenFlash > 0) {
+    ctx.fillStyle = `rgba(126, 231, 135, ${screenFlash * 0.3})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 function gameLoop() {
